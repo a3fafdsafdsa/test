@@ -1,10 +1,10 @@
 {
-  "appId": "com.ctq.qmc.aasdss.product",
-  "appName": "金鼎娱乐",
+  "appId": "com.ctq.qmc.aagffsdss.product",
+  "appName": "股票基金",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://aomenbali.com",
+    "url": "https://test100.testzjp.com",
     "cleartext": false
   },
   "android": {
