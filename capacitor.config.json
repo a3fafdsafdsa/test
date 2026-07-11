@@ -1,10 +1,10 @@
 {
   "appId": "com.ctq.qmc.yiban.product",
-  "appName": "乐盈",
+  "appName": "皇家盛典",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://test5www.testzjp.com/",
+    "url": "https://kaiyunhju.com",
     "cleartext": false
   },
   "android": {
