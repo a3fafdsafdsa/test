@@ -11,11 +11,6 @@ jobs:
       IOS_ROOT: $GITHUB_WORKSPACE/ios/App
       ANDROID_ROOT: $GITHUB_WORKSPACE/android
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
-      OUTPUT_DIR: $GITHUB_WORKSPACE/output
-      KEYSTORE_FILE: $GITHUB_WORKSPACE/temp.jks
-      KEYSTORE_PASS: Test@666888
-      KEY_ALIAS: testkey
-      KEY_PASS: Test@666888
 
     steps:
       - name: Checkout source
@@ -62,18 +57,17 @@ jobs:
       - name: Generate Temp Keystore
         run: |
           keytool -genkey -v \
-            -keystore ${{ env.KEYSTORE_FILE }} \
-            -alias ${{ env.KEY_ALIAS }} \
+            -keystore temp.jks \
+            -alias testkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass ${{ env.KEYSTORE_PASS }} \
-            -keypass ${{ env.KEY_PASS }} \
+            -storepass Test@666888 \
+            -keypass Test@666888 \
             -dname "CN=User, OU=Dev, O=Dev, L=HZ, S=ZJ, C=CN"
 
       - name: Inject Release Signing Config
         run: |
-          printf "\nandroid {\n    signingConfigs {\n        releaseTemp {\n            storeFile file(\"%s\")\n            storePassword \"%s\"\n            keyAlias \"%s\"\n            keyPassword \"%s\"\n        }\n    }\n    buildTypes {\n        release {\n            signingConfig signingConfigs.releaseTemp\n        }\n    }\n}" "${{ env.KEYSTORE_FILE }}" "${{ env.KEYSTORE_PASS }}" "${{ env.KEY_ALIAS }}" "${{ env.KEY_PASS }}" >> ${{ env.ANDROID_ROOT }}/app/build.gradle
+          printf "\nandroid {\n    signingConfigs {\n        releaseTemp {\n            storeFile file(\"temp.jks\")\n            storePassword \"Test@666888\"\n            keyAlias \"testkey\"\n            keyPassword \"Test@666888\"\n        }\n    }\n    buildTypes {\n        release {\n            signingConfig signingConfigs.releaseTemp\n        }\n    }\n}" >> ${{ env.ANDROID_ROOT }}/app/build.gradle
 
-      # ===========关键修改：java-version: 21 ===========
       - name: Setup JDK21
         uses: actions/setup-java@v4
         with:
@@ -100,22 +94,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
 
-      - name: Build IPA
-        run: |
-          mkdir -p ${{ env.OUTPUT_DIR }}/Payload
-          cp -r "${{ env.ARCHIVE_PATH }}/Products/Applications/App.app" "${{ env.OUTPUT_DIR }}/Payload/"
-          cd ${{ env.OUTPUT_DIR }}
-          zip -q -r App.ipa Payload
-          rm -rf Payload
-
+      # 修复复制目录
       - name: Copy Outputs
         run: |
-          mkdir -p ${{ env.OUTPUT_DIR }}
-          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release.apk ${{ env.OUTPUT_DIR }}/
+          mkdir -p ./output
+          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release.apk ./output/
+          ls -la ./output
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: 乐盈-成品包
-          path: ${{ env.OUTPUT_DIR }}/
+          path: ./output/
           retention-days: 30
