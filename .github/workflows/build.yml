@@ -31,7 +31,6 @@ jobs:
       - name: Install NPM dependencies
         run: npm ci
 
-      # 修复cap sync android assets缺失目录（cap同步依旧需要执行，capacitor生成iOS配置）
       - name: Prepare android assets folder
         run: mkdir -p android/app/src/main/assets
 
@@ -39,63 +38,20 @@ jobs:
         run: npx cap sync
 
       ###################################################################
-      # ========== Android 全部暂时跳过，如需使用解除下面注释 ==========
-      ###################################################################
-#      # Gradle缓存
-#      - name: Cache Gradle
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.gradle/caches
-#            ~/.gradle/wrapper
-#            android/.gradle
-#          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle*','android/gradle/wrapper/gradle-wrapper.properties') }}
-
-#      - name: Auto Generate Keystore
-#        run: |
-#          keytool -genkey -v \
-#            -keystore android/app/temp-release.keystore \
-#            -alias appkey \
-#            -keyalg RSA -keysize 2048 -validity 10000 \
-#            -storepass 123456 \
-#            -keypass 123456 \
-#            -dname "CN=Dev, OU=Dev, O=Dev, L=ChongQing, ST=CQ, C=CN"
-
-#      - name: Inject signing config into build.gradle
-#        run: |
-#          echo "
-#          android {
-#              signingConfigs {
-#                  release {
-#                      storeFile file('temp-release.keystore')
-#                      storePassword '123456'
-#                      keyAlias 'appkey'
-#                      keyPassword '123456'
-#                  }
-#              }
-#              buildTypes {
-#                  release {
-#                      signingConfig signingConfigs.release
-#                      minifyEnabled false
-#                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-#                  }
-#              }
-#          }
-#          " >> android/app/build.gradle
-
-#      - name: Build Signed Release APK
-#        working-directory: ./android
-#        run: |
-#          chmod +x gradlew
-#          ./gradlew assembleRelease
-      ###################################################################
-      # ===================== Android区块结束 =====================
+      # Android 全部注释 暂时跳过
       ###################################################################
 
       ##############################
-      # iOS 构建流程（正式启用）
+      # iOS 双层目录 ios/App/App（和你本地结构完全匹配）
       ##############################
-      # Pods缓存
+      # 调试打印目录（首次运行保留，后续正常可以删掉）
+      - name: Debug Print Folder
+        run: |
+          ls -la ios/
+          ls -la ios/App/
+          ls -la ios/App/App/
+
+      # CocoaPods缓存
       - name: Cache CocoaPods
         uses: actions/cache@v3
         with:
@@ -147,15 +103,8 @@ jobs:
             -exportPath ${{ env.OUTPUT_FOLDER }}
 
       ##############################
-      # 上传产物（仅保留IPA）
+      # 上传IPA产物
       ##############################
-#      - name: Upload Signed Android APK
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: Android-Temp-Signed-APK
-#          path: android/app/build/outputs/apk/release/app-release.apk
-#          retention-days: 14
-
       - name: Upload Unsigned iOS IPA
         uses: actions/upload-artifact@v4
         with:
