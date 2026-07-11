@@ -11,7 +11,7 @@
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "assets": "capacitor-assets generate --icon assets/icon.png"
+    "assets": "capacitor-assets generate assets/icon.png"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
