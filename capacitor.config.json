@@ -13,7 +13,8 @@
   "ios": {},
   "plugins": {
     "SplashScreen": {
-      "launchAutoHide": true
+      "launchAutoHide": true,
+      "launchShowDuration": 0
     }
   }
 }
