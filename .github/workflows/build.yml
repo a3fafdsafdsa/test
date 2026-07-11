@@ -8,7 +8,7 @@ jobs:
     runs-on: macos-latest
     env:
       BASE: $GITHUB_WORKSPACE
-      IOS_PROJECT: $GITHUB_WORKSPACE/ios/App/App
+      IOS_PROJECT_ROOT: $GITHUB_WORKSPACE/ios/App
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
       OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
     steps:
@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
 
-      # NPM依赖缓存
+      # NPM缓存
       - name: Cache Node Modules
         uses: actions/cache@v3
         with:
@@ -33,41 +33,40 @@ jobs:
       - name: Install NPM dependencies
         run: npm ci
 
-      # 目录校验（绝对路径打印，确认文件存在）
-      - name: Check ios absolute path files
+      # 目录打印校验
+      - name: Check iOS Root Directory
         run: |
-          echo "项目完整路径: ${{ env.IOS_PROJECT }}"
-          ls -la ${{ env.IOS_PROJECT }} || echo "❌ 目标目录不存在"
+          echo "iOS项目根目录: ${{ env.IOS_PROJECT_ROOT }}"
+          ls -la ${{ env.IOS_PROJECT_ROOT }}
 
       - name: Prepare android assets folder
         run: mkdir -p android/app/src/main/assets
 
-      # Capacitor 仅同步web+android，不同步iOS，防止原生工程被改写
-      - name: Capacitor sync
+      - name: Capacitor sync android
         run: npx cap sync android
 
       ###################################################################
-      # Android 所有构建步骤 全部注释 暂时跳过
+      # Android 构建全部注释，暂时跳过
       ###################################################################
 
       ##############################
-      # iOS 整套【全程使用绝对路径】
+      # iOS 构建流程（Podfile 在 ios/App）
       ##############################
       # CocoaPods缓存
       - name: Cache CocoaPods
         uses: actions/cache@v3
         with:
-          path: ${{ env.IOS_PROJECT }}/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('${{ env.IOS_PROJECT }}/Podfile.lock') }}
+          path: ${{ env.IOS_PROJECT_ROOT }}/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('${{ env.IOS_PROJECT_ROOT }}/Podfile.lock') }}
 
       - name: Install CocoaPods
         run: |
-          cd ${{ env.IOS_PROJECT }}
+          cd ${{ env.IOS_PROJECT_ROOT }}
           pod install --repo-update
 
       - name: Xcode Archive iOS (No Signing)
         run: |
-          cd ${{ env.IOS_PROJECT }}
+          cd ${{ env.IOS_PROJECT_ROOT }}
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
