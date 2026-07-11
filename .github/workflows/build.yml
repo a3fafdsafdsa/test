@@ -7,8 +7,7 @@ jobs:
   build:
     runs-on: macos-latest
     env:
-      # ⚠️ 修正！新版cap Podfile路径 ios/App/App
-      IOS_ROOT: $GITHUB_WORKSPACE/ios/App/App
+      IOS_ROOT: $GITHUB_WORKSPACE/ios/App
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
       OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
     steps:
@@ -26,22 +25,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 重建iOS工程
-      - name: Generate iOS native project
+      # =================核心修复：增加 --pod 强制生成CocoaPods工程=================
+      - name: Generate iOS native project (Force CocoaPods)
         run: |
           rm -rf ios
-          npx cap add ios
+          npx cap add ios --pod
           npx cap sync ios
           
-      # 打印目录用于确认文件位置
-      - name: Debug List Files
+      # 打印目录核对
+      - name: Debug List ios/App
         run: |
+          echo "==== ios/App 目录 ===="
           ls -la $GITHUB_WORKSPACE/ios/App
-          echo "=========="
-          ls -la $GITHUB_WORKSPACE/ios/App/App
 
       ##############################
-      # iOS 编译
+      # iOS 编译流程
       ##############################
       - name: Pod install
         run: |
