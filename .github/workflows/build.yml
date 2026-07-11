@@ -1,5 +1,5 @@
-name: Build Only iOS(Unsigned) Skip Android
-run-name: Skip Android | Build Unsigned IPA
+name: Build Android APK + iOS Unsigned IPA
+run-name: Build APK & IPA
 on:
   workflow_dispatch:
 
@@ -8,6 +8,7 @@ jobs:
     runs-on: macos-latest
     env:
       IOS_ROOT: $GITHUB_WORKSPACE/ios/App
+      ANDROID_ROOT: $GITHUB_WORKSPACE/android
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
       OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
     steps:
@@ -25,17 +26,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 重建iOS SPM原生工程
-      - name: Generate iOS SPM Project
+      ###################################################################
+      # 1. 生成 & 同步双平台原生工程
+      ###################################################################
+      - name: Generate Capacitor Native Projects
         run: |
-          rm -rf ios
+          rm -rf ios android
+          npx cap add android
           npx cap add ios
-          npx cap sync ios
+          npx cap sync
 
-      ##############################
-      # ARCHIVE 归档（成功，之前这一步一直没问题）
-      ##############################
-      - name: Xcode Archive
+      ###################################################################
+      # 2. Android 构建 Release APK
+      ###################################################################
+      - name: Setup JDK 17 for Android
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build Android Release APK
+        run: |
+          cd ${{ env.ANDROID_ROOT }}
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      ###################################################################
+      # 3. iOS Archive 编译（SPM项目，不使用pod）
+      ###################################################################
+      - name: Xcode Archive iOS
         run: |
           cd ${{ env.IOS_ROOT }}
           xcodebuild archive \
@@ -48,11 +68,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
 
-      ##############################
-      # 【关键改动】不使用xcodebuild导出IPA！
-      # 直接从xcarchive取出.app，手动构建IPA，完全避开teamID校验
-      ##############################
-      - name: Manual build IPA (Bypass Xcode export team check)
+      ###################################################################
+      # 4. iOS 手动打包IPA（绕开exportArchive team校验）
+      ###################################################################
+      - name: Manual Package iOS IPA
         run: |
           mkdir -p ${{ env.OUTPUT_FOLDER }}/Payload
           cp -r "${{ env.ARCHIVE_PATH }}/Products/Applications/App.app" "${{ env.OUTPUT_FOLDER }}/Payload/"
@@ -60,10 +79,21 @@ jobs:
           zip -q -r App.ipa Payload
           rm -rf Payload
 
-      # 上传产物
-      - name: Upload IPA
+      ###################################################################
+      # 5. 收集产物
+      ###################################################################
+      - name: Copy Android APK to Output
+        run: |
+          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release-unsigned.apk ${{ env.OUTPUT_FOLDER }}/app-release-unsigned.apk
+
+      ###################################################################
+      # 6. 上传构建产物
+      ###################################################################
+      - name: Upload All Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: iOS-Unsigned-IPA
-          path: ${{ env.OUTPUT_FOLDER }}/App.ipa
+          name: Build-Artifacts
+          path: |
+            ${{ env.OUTPUT_FOLDER }}/App.ipa
+            ${{ env.OUTPUT_FOLDER }}/app-release-unsigned.apk
           retention-days: 14
