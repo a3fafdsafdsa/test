@@ -25,21 +25,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 重建iOS SPM原生工程（新版cap默认SPM，无Podfile）
+      # 重建iOS SPM原生工程
       - name: Generate iOS SPM Project
         run: |
           rm -rf ios
           npx cap add ios
           npx cap sync ios
 
-      # 打印目录校验文件
       - name: Debug List ios/App
         run: ls -la ${{ env.IOS_ROOT }}
 
       ##############################
-      # 【重点】SPM项目 直接编译 .xcodeproj，不要找workspace/pod
+      # 归档：强制关闭所有签名、不绑定团队
       ##############################
-      - name: Xcode Archive (SPM No CocoaPods)
+      - name: Xcode Archive
         run: |
           cd ${{ env.IOS_ROOT }}
           xcodebuild archive \
@@ -49,9 +48,16 @@ jobs:
             -archivePath ${{ env.ARCHIVE_PATH }} \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
 
-      - name: Prepare exportOptions
+      ##############################
+      # 导出修复关键点
+      # 1. method改为 `debugging` 替代废弃的development
+      # 2. 添加 teamID="" 解决 No Team Found
+      # 3. compileBitcode关闭
+      ##############################
+      - name: Prepare exportOptions.plist
         run: |
           mkdir -p ${{ env.OUTPUT_FOLDER }}
           cat > exportOptions.plist <<EOF
@@ -60,11 +66,15 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>development</string>
+            <string>debugging</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>signingCertificate</key>
             <string></string>
+            <key>teamID</key>
+            <string></string>
+            <key>compileBitcode</key>
+            <false/>
             <key>provisioningProfiles</key>
             <dict/>
           </dict>
