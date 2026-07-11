@@ -26,7 +26,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # =====================【新增】先执行前端打包生成dist =====================
       - name: Build frontend dist
         run: npm run build
 
@@ -38,25 +37,25 @@ jobs:
           rm -rf ios android
           npx cap add android
           npx cap add ios
-          # 手动创建android assets目录，防止sync写入失败
           mkdir -p ${{ env.ANDROID_ROOT }}/app/src/main/assets
           npx cap sync
 
       ###################################################################
-      # Android 构建 Release APK
+      # Android 【修复】升级 JDK 21
       ###################################################################
-      - name: Setup JDK 17 for Android
+      - name: Setup JDK 21 for Android
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
 
+      # 强制Gradle使用JDK21编译
       - name: Build Android Release APK
         run: |
           cd ${{ env.ANDROID_ROOT }}
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease -Porg.gradle.java.home=${{ env.JAVA_HOME }}
 
       ###################################################################
       # iOS Archive 编译（SPM项目，无CocoaPods）
@@ -75,7 +74,7 @@ jobs:
             DEVELOPMENT_TEAM=""
 
       ###################################################################
-      # iOS 手动打包IPA（绕开teamID校验，不再使用exportArchive）
+      # iOS 手动打包IPA（绕开teamID校验）
       ###################################################################
       - name: Manual Package iOS IPA
         run: |
