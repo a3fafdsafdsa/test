@@ -1,10 +1,10 @@
 {
-  "appId": "com.ctq.qmc.yiban.product",
-  "appName": "皇家盛典",
+  "appId": "com.ctq.qmc.ss.product",
+  "appName": "盛世娱乐",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://kaiyunhju.com",
+    "url": "https://weinisidd.com",
     "cleartext": false
   },
   "android": {
