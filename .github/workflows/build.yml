@@ -55,7 +55,6 @@ jobs:
         run: |
           sed -i '' 's|VERSION_21|VERSION_17|g' ${{ env.ANDROID_ROOT }}/app/build.gradle
 
-      # 在仓库根目录生成证书
       - name: Generate Temp Keystore
         run: |
           keytool -genkey -v \
@@ -66,7 +65,6 @@ jobs:
             -keypass Test@666888 \
             -dname "CN=User, OU=Dev, O=Dev, L=HZ, S=ZJ, C=CN"
 
-      # ✅ 重点：storeFile 使用完整绝对路径
       - name: Inject Release Signing Config
         run: |
           printf "\nandroid {\n    signingConfigs {\n        releaseTemp {\n            storeFile file(\"%s\")\n            storePassword \"Test@666888\"\n            keyAlias \"testkey\"\n            keyPassword \"Test@666888\"\n        }\n    }\n    buildTypes {\n        release {\n            signingConfig signingConfigs.releaseTemp\n        }\n    }\n}" "${{ env.KEYSTORE_PATH }}" >> ${{ env.ANDROID_ROOT }}/app/build.gradle
@@ -97,32 +95,27 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
 
-      # ==========新增：xcarchive 导出 IPA ==========
+      - name: Create export plist
+        run: |
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > export.plist
+          echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> export.plist
+          echo '<plist version="1.0">' >> export.plist
+          echo '<dict>' >> export.plist
+          echo '    <key>method</key>' >> export.plist
+          echo '    <string>development</string>' >> export.plist
+          echo '    <key>compileBitcode</key>' >> export.plist
+          echo '    <false/>' >> export.plist
+          echo '</dict>' >> export.plist
+          echo '</plist>' >> export.plist
+
       - name: Export IPA
         run: |
           mkdir -p ./ipa_out
-          cat > export.plist <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>development</string>
-    <key>signingStyle</key>
-    <string>automatic</string>
-    <key>signingCertificate</key>
-    <string></string>
-    <key>compileBitcode</key>
-    <false/>
-</dict>
-</plist>
-EOF
           xcodebuild -exportArchive \
             -archivePath ${{ env.ARCHIVE_PATH }} \
             -exportOptionsPlist export.plist \
             -exportPath ./ipa_out
 
-      # 同时复制 APK + IPA 到输出目录
       - name: Copy Outputs
         run: |
           mkdir -p ./output
