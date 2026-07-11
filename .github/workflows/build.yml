@@ -92,29 +92,17 @@ jobs:
             -archivePath ${{ env.ARCHIVE_PATH }} \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM=""
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Create export plist
+      # ==========重点：手动组装未签名IPA，不调用exportArchive==========
+      - name: Build Unsigned IPA manually
         run: |
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > export.plist
-          echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> export.plist
-          echo '<plist version="1.0">' >> export.plist
-          echo '<dict>' >> export.plist
-          echo '    <key>method</key>' >> export.plist
-          echo '    <string>development</string>' >> export.plist
-          echo '    <key>compileBitcode</key>' >> export.plist
-          echo '    <false/>' >> export.plist
-          echo '</dict>' >> export.plist
-          echo '</plist>' >> export.plist
-
-      - name: Export IPA
-        run: |
+          mkdir -p ./Payload
+          cp -r "${{ env.ARCHIVE_PATH }}/Products/Applications/App.app" ./Payload/
+          zip -q -r App.ipa Payload
           mkdir -p ./ipa_out
-          xcodebuild -exportArchive \
-            -archivePath ${{ env.ARCHIVE_PATH }} \
-            -exportOptionsPlist export.plist \
-            -exportPath ./ipa_out
+          mv App.ipa ./ipa_out/
+          rm -rf Payload
 
       - name: Copy Outputs
         run: |
@@ -126,6 +114,6 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: 成品包
+          name: 乐盈-成品包
           path: ./output/
           retention-days: 30
