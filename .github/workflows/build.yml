@@ -7,6 +7,8 @@ jobs:
   build:
     runs-on: macos-latest
     env:
+      BASE: $GITHUB_WORKSPACE
+      IOS_PROJECT: $GITHUB_WORKSPACE/ios/App/App
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
       OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
     steps:
@@ -31,41 +33,41 @@ jobs:
       - name: Install NPM dependencies
         run: npm ci
 
+      # 目录校验（绝对路径打印，确认文件存在）
+      - name: Check ios absolute path files
+        run: |
+          echo "项目完整路径: ${{ env.IOS_PROJECT }}"
+          ls -la ${{ env.IOS_PROJECT }} || echo "❌ 目标目录不存在"
+
       - name: Prepare android assets folder
         run: mkdir -p android/app/src/main/assets
 
+      # Capacitor 仅同步web+android，不同步iOS，防止原生工程被改写
       - name: Capacitor sync
-        run: npx cap sync
+        run: npx cap sync android
 
       ###################################################################
-      # Android 全部注释 暂时跳过
+      # Android 所有构建步骤 全部注释 暂时跳过
       ###################################################################
 
       ##############################
-      # iOS 双层目录 ios/App/App（和你本地结构完全匹配）
+      # iOS 整套【全程使用绝对路径】
       ##############################
-      # 调试打印目录（首次运行保留，后续正常可以删掉）
-      - name: Debug Print Folder
-        run: |
-          ls -la ios/
-          ls -la ios/App/
-          ls -la ios/App/App/
-
       # CocoaPods缓存
       - name: Cache CocoaPods
         uses: actions/cache@v3
         with:
-          path: ios/App/App/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/App/App/Podfile.lock') }}
+          path: ${{ env.IOS_PROJECT }}/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('${{ env.IOS_PROJECT }}/Podfile.lock') }}
 
       - name: Install CocoaPods
         run: |
-          cd ios/App/App
+          cd ${{ env.IOS_PROJECT }}
           pod install --repo-update
 
       - name: Xcode Archive iOS (No Signing)
         run: |
-          cd ios/App/App
+          cd ${{ env.IOS_PROJECT }}
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
