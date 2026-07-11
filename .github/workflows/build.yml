@@ -97,15 +97,42 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
 
+      # ==========新增：xcarchive 导出 IPA ==========
+      - name: Export IPA
+        run: |
+          mkdir -p ./ipa_out
+          cat > export.plist <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>development</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>signingCertificate</key>
+    <string></string>
+    <key>compileBitcode</key>
+    <false/>
+</dict>
+</plist>
+EOF
+          xcodebuild -exportArchive \
+            -archivePath ${{ env.ARCHIVE_PATH }} \
+            -exportOptionsPlist export.plist \
+            -exportPath ./ipa_out
+
+      # 同时复制 APK + IPA 到输出目录
       - name: Copy Outputs
         run: |
           mkdir -p ./output
           cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release.apk ./output/
+          cp ./ipa_out/*.ipa ./output/ || true
           ls -la ./output
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: 乐盈-成品包
+          name: 成品包
           path: ./output/
           retention-days: 30
