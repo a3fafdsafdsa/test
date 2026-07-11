@@ -1,5 +1,5 @@
-name: Build Android APK + iOS Unsigned IPA
-run-name: Build APK & IPA
+name: Build Android Signed APK + iOS Unsigned IPA
+run-name: Build Signed APK & IPA
 on:
   workflow_dispatch:
 
@@ -11,6 +11,11 @@ jobs:
       ANDROID_ROOT: $GITHUB_WORKSPACE/android
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
       OUTPUT_DIR: $GITHUB_WORKSPACE/output
+      # 临时签名配置（流水线运行时动态使用，无需提前上传）
+      KEYSTORE_FILE: $GITHUB_WORKSPACE/temp-key.jks
+      KEYSTORE_PASS: Temp@123456
+      KEY_ALIAS: tempkey
+      KEY_PASS: Temp@123456
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -35,8 +40,8 @@ jobs:
           npx cap add android
           npx cap add ios
 
-      # ======================【重点：自动生成图标，写入双平台资源】======================
-      - name: Generate App Icon & Splash Screen
+      # 自动生成各尺寸应用图标
+      - name: Generate App Icon
         run: npm run assets
 
       - name: Prepare android assets dir
@@ -45,10 +50,46 @@ jobs:
       - name: Capacitor Sync
         run: npx cap sync
 
-      # 修复Java版本兼容，维持JDK17编译安卓
+      # 修复Gradle Java版本 21→17
       - name: Fix Gradle Java Version to 17
         run: |
           sed -i '' 's|VERSION_21|VERSION_17|g' ${{ env.ANDROID_ROOT }}/app/build.gradle
+
+      # ======================【新增1】动态生成临时密钥库 ======================
+      - name: Generate temporary keystore
+        run: |
+          keytool -genkey -v \
+            -keystore ${{ env.KEYSTORE_FILE }} \
+            -alias ${{ env.KEY_ALIAS }} \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass ${{ env.KEYSTORE_PASS }} \
+            -keypass ${{ env.KEY_PASS }} \
+            -dname "CN=TempDev, OU=Dev, O=Company, L=City, S=State, C=CN"
+
+      # ======================【新增2】动态修改build.gradle开启Release签名 ======================
+      - name: Inject signing config into build.gradle
+        run: |
+          cat >> ${{ env.ANDROID_ROOT }}/app/build.gradle <<EOF
+
+android {
+    signingConfigs {
+        releaseSign {
+            storeFile file("${{ env.KEYSTORE_FILE }}")
+            storePassword "${{ env.KEYSTORE_PASS }}"
+            keyAlias "${{ env.KEY_ALIAS }}"
+            keyPassword "${{ env.KEY_PASS }}"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.releaseSign
+        }
+    }
+}
+EOF
 
       - name: Setup JDK 17 for Android
         uses: actions/setup-java@v4
@@ -57,7 +98,8 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Build Android Release APK
+      # 编译【已签名Release APK】
+      - name: Build Signed Release APK
         run: |
           cd ${{ env.ANDROID_ROOT }}
           chmod +x gradlew
@@ -86,12 +128,12 @@ jobs:
           zip -q -r App.ipa Payload
           rm -rf Payload
 
-      # 复制APK输出
-      - name: Copy APK to Output Folder
+      # 复制【签名APK】到输出目录
+      - name: Copy Signed APK to Output
         run: |
-          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release-unsigned.apk ${{ env.OUTPUT_DIR }}/
+          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release.apk ${{ env.OUTPUT_DIR }}/
 
-      # 上传产物（页面底部Artifacts下载）
+      # 上传产物
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
