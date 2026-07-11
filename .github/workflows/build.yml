@@ -19,38 +19,31 @@ jobs:
         with:
           node-version: 22
 
-      - name: Set npm 淘宝镜像
+      - name: Set npm mirror
         run: npm config set registry https://registry.npmmirror.com
 
       - name: Install dependencies
         run: npm ci
 
-      # =================核心修复：增加 --pod 强制生成CocoaPods工程=================
-      - name: Generate iOS native project (Force CocoaPods)
+      # 重建iOS SPM原生工程（新版cap默认SPM，无Podfile）
+      - name: Generate iOS SPM Project
         run: |
           rm -rf ios
-          npx cap add ios --pod
+          npx cap add ios
           npx cap sync ios
-          
-      # 打印目录核对
+
+      # 打印目录校验文件
       - name: Debug List ios/App
-        run: |
-          echo "==== ios/App 目录 ===="
-          ls -la $GITHUB_WORKSPACE/ios/App
+        run: ls -la ${{ env.IOS_ROOT }}
 
       ##############################
-      # iOS 编译流程
+      # 【重点】SPM项目 直接编译 .xcodeproj，不要找workspace/pod
       ##############################
-      - name: Pod install
-        run: |
-          cd ${{ env.IOS_ROOT }}
-          pod install --repo-update
-
-      - name: Xcode Archive (No Sign)
+      - name: Xcode Archive (SPM No CocoaPods)
         run: |
           cd ${{ env.IOS_ROOT }}
           xcodebuild archive \
-            -workspace App.xcworkspace \
+            -project App.xcodeproj \
             -scheme App \
             -configuration Release \
             -archivePath ${{ env.ARCHIVE_PATH }} \
