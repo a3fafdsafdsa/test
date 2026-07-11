@@ -1,7 +1,7 @@
 name: Build App Android(TempKey) + iOS(Unsigned)
 run-name: Temp Keystore Android + Unsigned IPA
 on:
-  workflow_dispatch: # 网页手动触发打包
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,6 +12,9 @@ jobs:
       KEYSTORE_PWD: 123456
       KEY_ALIAS: appkey
       KEY_PWD: 123456
+      IOS_ROOT: ios/App/App
+      ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
+      OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -25,7 +28,7 @@ jobs:
       - name: Install NPM dependencies
         run: npm ci
 
-      # 预先创建assets目录，解决cap sync报错
+      # 修复cap sync android assets缺失
       - name: Prepare android assets folder
         run: mkdir -p android/app/src/main/assets
 
@@ -33,7 +36,7 @@ jobs:
         run: npx cap sync
 
       ##############################
-      # Android：云端自动生成临时签名密钥
+      # Android 编译（临时自动签名APK）
       ##############################
       - name: Auto Generate Keystore
         run: |
@@ -74,26 +77,27 @@ jobs:
           ./gradlew assembleRelease
 
       ##############################
-      # iOS：编译不签名，输出未签名裸IPA
+      # iOS 整套【完全修复版本】
       ##############################
       - name: Install CocoaPods
-        working-directory: ./ios/App
-        run: pod install
+        working-directory: ${{ env.IOS_ROOT }}
+        run: pod install --repo-update
 
-      - name: Xcode Archive iOS (NO SIGNING)
+      - name: Xcode Archive iOS (No Signing)
+        working-directory: ${{ env.IOS_ROOT }}
         run: |
-          cd ios/App
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
-            -archivePath $GITHUB_WORKSPACE/build/App.xcarchive \
+            -archivePath ${{ env.ARCHIVE_PATH }} \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Create exportOptions.plist (No Sign)
+      - name: Prepare export config
         run: |
+          mkdir -p ${{ env.OUTPUT_FOLDER }}
           cat > exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -107,6 +111,8 @@ jobs:
             <string></string>
             <key>provisioningProfiles</key>
             <dict/>
+            <key>signingCertificateSubject</key>
+            <string></string>
           </dict>
           </plist>
           EOF
@@ -114,12 +120,12 @@ jobs:
       - name: Export unsigned IPA
         run: |
           xcodebuild -exportArchive \
-            -archivePath build/App.xcarchive \
+            -archivePath ${{ env.ARCHIVE_PATH }} \
             -exportOptionsPlist exportOptions.plist \
-            -exportPath ./output
+            -exportPath ${{ env.OUTPUT_FOLDER }}
 
       ##############################
-      # 上传构建产物
+      # 上传产物
       ##############################
       - name: Upload Signed Android APK
         uses: actions/upload-artifact@v4
@@ -132,5 +138,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iOS-Unsigned-IPA
-          path: output/*.ipa
+          path: ${{ env.OUTPUT_FOLDER }}/*.ipa
           retention-days: 14
