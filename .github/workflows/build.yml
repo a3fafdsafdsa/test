@@ -1,5 +1,5 @@
-name: Build App Android(TempKey) + iOS(Unsigned)
-run-name: Temp Keystore Android + Unsigned IPA
+name: Build Only iOS(Unsigned) Skip Android
+run-name: Skip Android | Build Unsigned IPA
 on:
   workflow_dispatch:
 
@@ -7,12 +7,6 @@ jobs:
   build:
     runs-on: macos-latest
     env:
-      APP_ID: com.ctq.qmc.yiban.product
-      KEYSTORE_FILE: android/app/temp-release.keystore
-      KEYSTORE_PWD: 123456
-      KEY_ALIAS: appkey
-      KEY_PWD: 123456
-      IOS_ROOT: ios/App/App
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
       OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
     steps:
@@ -23,69 +17,99 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      # NPM依赖缓存
+      - name: Cache Node Modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+
+      - name: Set npm 国内镜像
+        run: npm config set registry https://registry.npmmirror.com
 
       - name: Install NPM dependencies
         run: npm ci
 
-      # 修复cap sync android assets缺失
+      # 修复cap sync android assets缺失目录（cap同步依旧需要执行，capacitor生成iOS配置）
       - name: Prepare android assets folder
         run: mkdir -p android/app/src/main/assets
 
       - name: Capacitor sync
         run: npx cap sync
 
-      ##############################
-      # Android 编译（临时自动签名APK）
-      ##############################
-      - name: Auto Generate Keystore
-        run: |
-          keytool -genkey -v \
-            -keystore ${{ env.KEYSTORE_FILE }} \
-            -alias ${{ env.KEY_ALIAS }} \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass ${{ env.KEYSTORE_PWD }} \
-            -keypass ${{ env.KEY_PWD }} \
-            -dname "CN=Dev, OU=Dev, O=Dev, L=ChongQing, ST=CQ, C=CN"
+      ###################################################################
+      # ========== Android 全部暂时跳过，如需使用解除下面注释 ==========
+      ###################################################################
+#      # Gradle缓存
+#      - name: Cache Gradle
+#        uses: actions/cache@v3
+#        with:
+#          path: |
+#            ~/.gradle/caches
+#            ~/.gradle/wrapper
+#            android/.gradle
+#          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle*','android/gradle/wrapper/gradle-wrapper.properties') }}
 
-      - name: Inject signing config into build.gradle
-        run: |
-          echo "
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file('temp-release.keystore')
-                      storePassword '${{ env.KEYSTORE_PWD }}'
-                      keyAlias '${{ env.KEY_ALIAS }}'
-                      keyPassword '${{ env.KEY_PWD }}'
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-                  }
-              }
-          }
-          " >> android/app/build.gradle
+#      - name: Auto Generate Keystore
+#        run: |
+#          keytool -genkey -v \
+#            -keystore android/app/temp-release.keystore \
+#            -alias appkey \
+#            -keyalg RSA -keysize 2048 -validity 10000 \
+#            -storepass 123456 \
+#            -keypass 123456 \
+#            -dname "CN=Dev, OU=Dev, O=Dev, L=ChongQing, ST=CQ, C=CN"
 
-      - name: Build Signed Release APK
-        working-directory: ./android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease
+#      - name: Inject signing config into build.gradle
+#        run: |
+#          echo "
+#          android {
+#              signingConfigs {
+#                  release {
+#                      storeFile file('temp-release.keystore')
+#                      storePassword '123456'
+#                      keyAlias 'appkey'
+#                      keyPassword '123456'
+#                  }
+#              }
+#              buildTypes {
+#                  release {
+#                      signingConfig signingConfigs.release
+#                      minifyEnabled false
+#                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+#                  }
+#              }
+#          }
+#          " >> android/app/build.gradle
+
+#      - name: Build Signed Release APK
+#        working-directory: ./android
+#        run: |
+#          chmod +x gradlew
+#          ./gradlew assembleRelease
+      ###################################################################
+      # ===================== Android区块结束 =====================
+      ###################################################################
 
       ##############################
-      # iOS 整套【完全修复版本】
+      # iOS 构建流程（正式启用）
       ##############################
+      # Pods缓存
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: ios/App/App/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/App/App/Podfile.lock') }}
+
       - name: Install CocoaPods
-        working-directory: ${{ env.IOS_ROOT }}
-        run: pod install --repo-update
+        run: |
+          cd ios/App/App
+          pod install --repo-update
 
       - name: Xcode Archive iOS (No Signing)
-        working-directory: ${{ env.IOS_ROOT }}
         run: |
+          cd ios/App/App
           xcodebuild archive \
             -workspace App.xcworkspace \
             -scheme App \
@@ -111,8 +135,6 @@ jobs:
             <string></string>
             <key>provisioningProfiles</key>
             <dict/>
-            <key>signingCertificateSubject</key>
-            <string></string>
           </dict>
           </plist>
           EOF
@@ -125,14 +147,14 @@ jobs:
             -exportPath ${{ env.OUTPUT_FOLDER }}
 
       ##############################
-      # 上传产物
+      # 上传产物（仅保留IPA）
       ##############################
-      - name: Upload Signed Android APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-Temp-Signed-APK
-          path: android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 14
+#      - name: Upload Signed Android APK
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: Android-Temp-Signed-APK
+#          path: android/app/build/outputs/apk/release/app-release.apk
+#          retention-days: 14
 
       - name: Upload Unsigned iOS IPA
         uses: actions/upload-artifact@v4
