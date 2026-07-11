@@ -10,7 +10,7 @@ jobs:
       IOS_ROOT: $GITHUB_WORKSPACE/ios/App
       ANDROID_ROOT: $GITHUB_WORKSPACE/android
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
-      OUTPUT_FOLDER: $GITHUB_WORKSPACE/output
+      OUTPUT_DIR: $GITHUB_WORKSPACE/output
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -29,9 +29,6 @@ jobs:
       - name: Build frontend dist
         run: npm run build
 
-      ###################################################################
-      # 生成双平台原生工程
-      ###################################################################
       - name: Generate Capacitor Native Projects
         run: |
           rm -rf ios android
@@ -40,26 +37,23 @@ jobs:
           mkdir -p ${{ env.ANDROID_ROOT }}/app/src/main/assets
           npx cap sync
 
-      ###################################################################
-      # Android 【修复】升级 JDK 21
-      ###################################################################
-      - name: Setup JDK 21 for Android
+      - name: Fix Gradle Java Version to 17
+        run: |
+          sed -i '' 's|VERSION_21|VERSION_17|g' ${{ env.ANDROID_ROOT }}/app/build.gradle
+
+      - name: Setup JDK 17 for Android
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '17'
           distribution: 'temurin'
           cache: gradle
 
-      # 强制Gradle使用JDK21编译
       - name: Build Android Release APK
         run: |
           cd ${{ env.ANDROID_ROOT }}
           chmod +x gradlew
-          ./gradlew assembleRelease -Porg.gradle.java.home=${{ env.JAVA_HOME }}
+          ./gradlew assembleRelease
 
-      ###################################################################
-      # iOS Archive 编译（SPM项目，无CocoaPods）
-      ###################################################################
       - name: Xcode Archive iOS
         run: |
           cd ${{ env.IOS_ROOT }}
@@ -73,32 +67,25 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
 
-      ###################################################################
-      # iOS 手动打包IPA（绕开teamID校验）
-      ###################################################################
+      # =========【修复】提前创建output，打包后验证文件存在 =========
       - name: Manual Package iOS IPA
         run: |
-          mkdir -p ${{ env.OUTPUT_FOLDER }}/Payload
-          cp -r "${{ env.ARCHIVE_PATH }}/Products/Applications/App.app" "${{ env.OUTPUT_FOLDER }}/Payload/"
-          cd ${{ env.OUTPUT_FOLDER }}
+          mkdir -p ${{ env.OUTPUT_DIR }}/Payload
+          cp -r "${{ env.ARCHIVE_PATH }}/Products/Applications/App.app" "${{ env.OUTPUT_DIR }}/Payload/"
+          cd ${{ env.OUTPUT_DIR }}
           zip -q -r App.ipa Payload
           rm -rf Payload
+          ls -la ${{ env.OUTPUT_DIR }}
 
-      ###################################################################
-      # 复制APK到输出目录
-      ###################################################################
-      - name: Copy Android APK to Output
+      - name: Copy APK to Output
         run: |
-          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release-unsigned.apk ${{ env.OUTPUT_FOLDER }}/app-release-unsigned.apk
+          mkdir -p ${{ env.OUTPUT_DIR }}
+          cp ${{ env.ANDROID_ROOT }}/app/build/outputs/apk/release/app-release-unsigned.apk ${{ env.OUTPUT_DIR }}/
+          ls -la ${{ env.OUTPUT_DIR }}
 
-      ###################################################################
-      # 上传产物
-      ###################################################################
       - name: Upload All Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Build-Artifacts
-          path: |
-            ${{ env.OUTPUT_FOLDER }}/App.ipa
-            ${{ env.OUTPUT_FOLDER }}/app-release-unsigned.apk
+          path: ${{ env.OUTPUT_DIR }}/
           retention-days: 14
