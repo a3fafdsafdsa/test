@@ -1,0 +1,18 @@
+{
+  "appId": "com.ctq.qmc.yiban.product",
+  "appName": "乐盈",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "http://test5www.testzjp.com/",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true
+    }
+  }
+}
