@@ -11,6 +11,7 @@ jobs:
       IOS_ROOT: $GITHUB_WORKSPACE/ios/App
       ANDROID_ROOT: $GITHUB_WORKSPACE/android
       ARCHIVE_PATH: $GITHUB_WORKSPACE/build/App.xcarchive
+      KEYSTORE_PATH: $GITHUB_WORKSPACE/temp.jks
 
     steps:
       - name: Checkout source
@@ -54,19 +55,21 @@ jobs:
         run: |
           sed -i '' 's|VERSION_21|VERSION_17|g' ${{ env.ANDROID_ROOT }}/app/build.gradle
 
+      # 在仓库根目录生成证书
       - name: Generate Temp Keystore
         run: |
           keytool -genkey -v \
-            -keystore temp.jks \
+            -keystore ${{ env.KEYSTORE_PATH }} \
             -alias testkey \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass Test@666888 \
             -keypass Test@666888 \
             -dname "CN=User, OU=Dev, O=Dev, L=HZ, S=ZJ, C=CN"
 
+      # ✅ 重点：storeFile 使用完整绝对路径
       - name: Inject Release Signing Config
         run: |
-          printf "\nandroid {\n    signingConfigs {\n        releaseTemp {\n            storeFile file(\"temp.jks\")\n            storePassword \"Test@666888\"\n            keyAlias \"testkey\"\n            keyPassword \"Test@666888\"\n        }\n    }\n    buildTypes {\n        release {\n            signingConfig signingConfigs.releaseTemp\n        }\n    }\n}" >> ${{ env.ANDROID_ROOT }}/app/build.gradle
+          printf "\nandroid {\n    signingConfigs {\n        releaseTemp {\n            storeFile file(\"%s\")\n            storePassword \"Test@666888\"\n            keyAlias \"testkey\"\n            keyPassword \"Test@666888\"\n        }\n    }\n    buildTypes {\n        release {\n            signingConfig signingConfigs.releaseTemp\n        }\n    }\n}" "${{ env.KEYSTORE_PATH }}" >> ${{ env.ANDROID_ROOT }}/app/build.gradle
 
       - name: Setup JDK21
         uses: actions/setup-java@v4
@@ -94,7 +97,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM=""
 
-      # 修复复制目录
       - name: Copy Outputs
         run: |
           mkdir -p ./output
