@@ -10,6 +10,7 @@
   "android": {
     "allowMixedContent": false
   },
+  "ios": {},
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true
