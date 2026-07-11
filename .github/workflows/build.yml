@@ -34,6 +34,10 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      # ==========新增：修复bin脚本执行权限==========
+      - name: Fix binary execute permission
+        run: chmod +x ./node_modules/.bin/*
+
       - name: Build Web Dist
         run: npm run build
 
@@ -112,6 +116,6 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: 乐盈-成品包
+          name: 成品包
           path: ${{ env.OUTPUT_DIR }}/
           retention-days: 30
