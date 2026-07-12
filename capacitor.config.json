@@ -1,6 +1,6 @@
 {
-  "appId": "com.ctq.qmc.aagffsdss.product",
-  "appName": "股票基金",
+  "appId": "com.hxcf.app",
+  "appName": "恒信财富",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
