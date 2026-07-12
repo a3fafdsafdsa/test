@@ -1,6 +1,6 @@
 {
-  "appId": "com.jxlc.app",
-  "appName": "金盛理财",
+  "appId": "com.yctz.app",
+  "appName": "盈创投资",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
